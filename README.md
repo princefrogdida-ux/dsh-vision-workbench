@@ -1,6 +1,6 @@
-# dsh-vision-workbench
+# DSH Vision Suite
 
-面向 Windows 的 DeepSeek Harness 视觉能力插件。它在保留官方 <code>deepseek-official</code> 文本路由的同时，为 DeepSeek 增加图片理解、OCR、截图裁剪、像素差异比较、主色提取和安全网页截图能力。
+面向 Windows 的 DeepSeek Harness 视觉能力套件，插件包名为 <code>dsh-vision-workbench</code>。它在保留官方 <code>deepseek-official</code> 文本路由的同时，为 DeepSeek 增加图片理解、OCR、截图裁剪、像素差异比较、主色提取和安全网页截图能力。
 
 DeepSeek 继续负责推理。只有调用远程视觉工具时，插件才会把用户选定的图片发送给已配置的 OpenAI-compatible 视觉模型。
 
@@ -40,6 +40,26 @@ DeepSeek 继续负责推理。只有调用远程视觉工具时，插件才会�
 6. 重启当前 Profile，使路由和工具配置生效。
 
 API Key 密码框为空时会保留已经保存的密钥。页面刷新后不会回显密钥，只会显示对应凭据是否已经配置。
+
+## API Key 官方入口
+
+下面这些服务都提供官方 API Key，并有可通过 OpenAI-compatible Chat Completions 接收图片的模型。实际可用模型、额度和区域限制可能变化，请以服务商官网当前信息为准。
+
+| 服务商 | <code>baseURL</code> | API Key 官网 | 视觉兼容说明 |
+| --- | --- | --- | --- |
+| OpenAI | <code>https://api.openai.com/v1</code> | [创建 API Key](https://platform.openai.com/api-keys) | [查看支持 Image input 和 Chat Completions 的模型](https://developers.openai.com/api/docs/models/compare) |
+| OpenRouter | <code>https://openrouter.ai/api/v1</code> | [创建或管理 API Key](https://openrouter.ai/settings/keys) | [Image Inputs 官方文档](https://openrouter.ai/docs/guides/overview/multimodal/image-understanding) |
+| 硅基流动 SiliconFlow | <code>https://api.siliconflow.cn/v1</code> | [创建或管理 API Key](https://cloud.siliconflow.cn/account/ak) | [多模态输入官方文档](https://api-docs.siliconflow.cn/docs/userguide/capabilities/multimodal-vision) |
+| 阿里云百炼 | 中国大陆：<code>https://dashscope.aliyuncs.com/compatible-mode/v1</code><br>国际：<code>https://dashscope-intl.aliyuncs.com/compatible-mode/v1</code> | [获取与配置 API Key](https://help.aliyun.com/zh/model-studio/get-api-key/) | [OpenAI 兼容 Chat 与图片输入](https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions) |
+
+在插件中配置时：
+
+1. 把表格中的地址填入 <code>visionProvider.baseURL</code>。
+2. 从服务商官网复制一个支持图片输入的模型 ID，填入 <code>visionProvider.model</code>。
+3. 为该服务设置独立的 <code>credentialRef</code>，例如 <code>OPENAI_VISION_KEY</code> 或 <code>OPENROUTER_VISION_KEY</code>。
+4. 把真实 API Key 粘贴到对应 Provider 卡片的密码框中，不要写入 YAML、截图、Issue 或日志。
+
+同一个服务商可能同时提供纯文本模型和视觉模型。选择模型时必须确认它支持 <code>image_url</code> 图片输入以及 <code>/chat/completions</code> 接口。
 
 ## 最小可用配置
 

@@ -1,15 +1,15 @@
 {
   "name": "dsh-vision-workbench",
   "version": "0.7.1",
-  "description": "Windows-first, non-invasive vision tools for DeepSeek Harness.",
+  "description": "Windows-first vision suite for DeepSeek Harness.",
   "license": "MIT",
-  "homepage": "https://github.com/princefrogdida-ux/dsh-vision-workbench#readme",
+  "homepage": "https://github.com/princefrogdida-ux/dsh-vision-suite#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/princefrogdida-ux/dsh-vision-workbench.git"
+    "url": "git+https://github.com/princefrogdida-ux/dsh-vision-suite.git"
   },
   "bugs": {
-    "url": "https://github.com/princefrogdida-ux/dsh-vision-workbench/issues"
+    "url": "https://github.com/princefrogdida-ux/dsh-vision-suite/issues"
   },
   "type": "module",
   "main": "lib/index.js",
