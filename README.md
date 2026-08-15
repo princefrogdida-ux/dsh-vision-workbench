@@ -1,70 +1,208 @@
 # dsh-vision-workbench
 
-面向 Windows、默认不接管官方模型路由的 DeepSeek Harness 视觉工具插件。
+面向 Windows 的 DeepSeek Harness 视觉能力插件。它在保留官方 <code>deepseek-official</code> 文本路由的同时，为 DeepSeek 增加图片理解、OCR、截图裁剪、像素差异比较、主色提取和安全网页截图能力。
 
-当前 `0.7.1` 已完成阶段 0～6：除图片准入包装路由和 `vision_describe` 外，还提供 Windows 本地像素处理、可选离线 OCR、安全网页截图闭环、有界的多视觉 Provider 自动回退，以及 DeepSeek Harness 原生可视化配置卡片。DeepSeek 继续负责推理；只有远程视觉工具调用才会把图片发送给用户明确配置的 OpenAI-compatible 视觉模型。
+DeepSeek 继续负责推理。只有调用远程视觉工具时，插件才会把用户选定的图片发送给已配置的 OpenAI-compatible 视觉模型。
 
-## 当前能力
+## 插件能力
 
-- 上传 PNG、JPEG、WebP 后，包装路由把持久化附件投影成带附件 ID 的文本标记。
-- `vision_describe` 支持 1～4 张上传图片或工作区图片。
-- 支持普通图片问答、多图比较和结构化截图证据。
-- 工具结果作为规范 JSON 值写入会话，因此重新打开会话仍可回放。
-- 有界附件索引、字节/像素限制、超时、LRU/TTL 缓存和一次 429 重试。
-- API Key 通过 `ctx.credentials` 引用读取；不写入配置或日志。
-- 可选代理按本插件请求配置，不修改 `globalThis.fetch`。
-- `vision_crop` 按像素坐标裁剪，并把派生 PNG 保存为持久附件。
-- `vision_compare` 对同尺寸截图进行确定性像素比较，返回变化比例和洋红色差异图。
-- `vision_palette` 在本地提取稳定的近似主色。
-- `vision_ocr` 默认使用已配置视觉 Provider，也可显式选择 `backend="local"`，通过本地 Tesseract.js 转录文字；两种后端都可先裁剪指定区域。
-- 本地 OCR 只读取明确配置的绝对语言数据目录，关闭缓存写入和运行时下载，单 Worker 串行复用并在插件卸载时终止。
-- Sharp 为惰性加载的可选后端；缺失时远程 `vision_describe` 和非区域 OCR 仍可使用。
-- `vision_browser_capture` 在全新无头 Edge/Chrome 临时上下文中打开明确白名单 URL，并把 PNG 保存为持久附件。
-- 网页导航、重定向、子资源和 WebSocket 共用精确主机白名单；默认拒绝本机、局域网和云元数据地址。
-- 支持一个主视觉 Provider 和最多三个有序后备 Provider；单次失败会分类、回退，并通过短路冷却避免持续轰击故障端点。
-- 描述和 OCR 结果持久记录实际 Provider、模型、尝试次数以及是否使用后备，不把端点错误正文或凭据写入结果。
-- 在“设置 → 插件 → 插件配置”中点击 `Vision Workbench`，可直接编辑全部配置字段；每个视觉 Provider 都有独立的写入式 API Key 密码框。
-- API Key 只进入 Harness Credentials；配置界面只读取“已配置/未配置”和可写状态，永不回显密钥。
+| 工具 | 作用 | 执行位置 |
+| --- | --- | --- |
+| <code>vision_describe</code> | 理解 1～4 张上传图片或工作区图片，支持图片问答、多图比较和结构化截图证据 | 视觉 Provider |
+| <code>vision_ocr</code> | 识别整张图片或指定区域中的文字，可选择远程视觉模型或本地 Tesseract | Provider 或本机 |
+| <code>vision_crop</code> | 按像素坐标裁剪图片，并保存为可继续使用的持久附件 | 本机 |
+| <code>vision_compare</code> | 比较两张同尺寸截图，返回变化比例和洋红色差异图 | 本机 |
+| <code>vision_palette</code> | 提取图片中的近似主色 | 本机 |
+| <code>vision_browser_capture</code> | 使用独立的无头 Edge 或 Chrome 截取白名单网页 | 本机浏览器 |
 
-## 明确不做
+插件还提供：
 
-- 不禁用或接管 `deepseek-official`。
-- 不内置匿名免费视觉端点。
-- 不修改全局附件限制。
-- 不自动缩放或对齐待比较截图；尺寸不一致会明确失败。
-- 不捆绑 Tesseract 语言数据，不自动下载语言包，也不包含 SVG 描摹或前景抠除。
-- 不接管用户已打开的 Edge/Chrome，不复用登录态，不点击、输入、提交表单或下载文件。
-- 不支持 GIF；请先转换为 PNG、JPEG 或 WebP。
+- 支持 PNG、JPEG 和 WebP。
+- 图片附件使用持久 ID，工具结果可随会话保存和回放。
+- 支持一个主视觉 Provider 和最多三个顺序后备 Provider。
+- Provider 失败时执行有限回退，并通过冷却机制避免持续请求故障端点。
+- 支持图片数量、文件大小、像素数、工作像素、超时和缓存限制。
+- API Key 通过 Harness Credentials 保存，不写入插件配置、日志或页面响应。
+- 可为插件请求单独配置 HTTP/HTTPS 代理，不修改全局网络设置。
+- Sharp、Tesseract.js 和浏览器能力均按需加载。
 
-## 兼容基线
+## 配置入口
 
-- DeepSeek Harness `0.1.0-rc.5`
-- Node `^22.19.0 || >=24.0.0`
-- pnpm `11.7.0`
+插件安装后默认保持关闭，不会自动接管模型路由，也不会自动发送图片。
 
-Harness 框架包声明为宿主提供的 peer dependencies，避免插件安装第二份 Cordis/服务运行时。由于 npm 未发布
-`dsh-llm@0.1.0-rc.5` 等完整 rc.5 包组，本地开发使用 rc.6 包做编译和纯模拟测试；最终兼容性仍以本机 rc.5
-源码审查和独立 Profile 加载测试为准，绝不把 rc.6 实现打入插件包。
+推荐使用 DeepSeek Harness 原生配置页面：
 
-## 安全安装流程
-
-Bundle 安装后默认保持 `enabled: false`，不会注册远程视觉能力。开发和验证应使用独立 Profile，例如 `vision-lab`，不要直接修改主 Profile。
-
-推荐使用原生可视化配置：
-
-1. 启动已安装本插件的 Web Profile。
+1. 启动安装了本插件的 Web Profile。
 2. 打开“设置 → 插件 → 插件配置”。
-3. 点击 `Vision Workbench` 展开完整表单。
-4. 填写视觉模型的 Base URL、模型名、凭据引用名和 API Key；按需调整 OCR、浏览器截图、缓存、代理等高级选项。
-5. 点击“保存配置”，然后重启当前 Profile。插件的设置命名空间声明为 `restart`，避免正在执行的视觉任务被中途换路由或释放资源。
+3. 点击 <code>Vision Workbench</code> 展开全部配置项。
+4. 填写文本模型、视觉 Provider 和 API Key。
+5. 打开“启用插件”，保存配置。
+6. 重启当前 Profile，使路由和工具配置生效。
 
-密码框留空表示保留现有密钥。保存的 API Key 不进入 Settings 文档、`cordis.patch.yml`、日志或页面响应；界面刷新后密码框仍为空，只显示“已配置”。
+API Key 密码框为空时会保留已经保存的密钥。页面刷新后不会回显密钥，只会显示对应凭据是否已经配置。
 
-以下 YAML 仅作为无 Web UI 或自动化部署时的备用方式：
+## 最小可用配置
 
-在独立 Profile 的后置 Patch 中完整覆盖配置：
+第一次使用只需要配置以下内容：
 
-```yaml
+| 配置项 | 推荐值或说明 |
+| --- | --- |
+| <code>enabled</code> | 开启 |
+| <code>wrapperRoute</code> | 保持 <code>deepseek-vision-workbench</code> |
+| <code>textProvider.provider</code> | 保持 <code>deepseek-official</code> |
+| <code>textProvider.model</code> | 选择当前 Harness 中可用的 DeepSeek 模型 |
+| <code>visionProvider.name</code> | <code>primary</code> |
+| <code>visionProvider.baseURL</code> | 视觉服务的 OpenAI-compatible API 地址，例如 <code>https://api.example.com/v1</code> |
+| <code>visionProvider.model</code> | 服务商提供的视觉模型名称 |
+| <code>visionProvider.credentialRef</code> | 凭据名称，例如 <code>VISION_API_KEY</code> |
+| API Key | 在同一 Provider 卡片的密码框中输入 |
+
+保存并重启 Profile 后，在模型选择器中选择：
+
+~~~text
+DeepSeek + Vision Workbench / <配置的 DeepSeek 模型>
+~~~
+
+随后上传图片并直接提问，例如“识别这张截图中的文字”或“比较这两张图片的布局差异”。
+
+## 基础配置
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>enabled</code> | <code>false</code> | 是否注册包装路由和视觉工具 |
+| <code>wrapperRoute</code> | <code>deepseek-vision-workbench</code> | 插件自己的模型路由名称，不能与 <code>deepseek-official</code> 或文本 Provider 重名 |
+| <code>textProvider.provider</code> | <code>deepseek-official</code> | 负责最终推理的文本 Provider |
+| <code>textProvider.model</code> | <code>deepseek-v4-pro</code> | 包装路由公布的文本模型 |
+| <code>timeoutMs</code> | <code>120000</code> | 一次视觉工具调用的总超时 |
+| <code>proxyUrl</code> | 空 | 仅用于本插件请求的 HTTP/HTTPS 代理 |
+
+## 视觉 Provider
+
+主 Provider 位于 <code>visionProvider</code>，后备 Provider 位于 <code>fallbackProviders</code>。
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>name</code> | <code>primary</code> | Provider 标识；主备 Provider 之间不能重名 |
+| <code>baseURL</code> | 空 | OpenAI-compatible API 根地址，正常使用必须是 HTTPS |
+| <code>model</code> | 空 | 视觉模型名称 |
+| <code>credentialRef</code> | <code>VISION_API_KEY</code> | Harness Credentials 中的凭据名称 |
+| <code>allowKeyless</code> | <code>false</code> | 仅在服务明确不需要密钥时开启 |
+| <code>allowInsecureLocalhost</code> | <code>false</code> | 仅允许显式连接本机回环地址上的 HTTP 测试服务 |
+| <code>maxTokens</code> | <code>4096</code> | 视觉模型最大输出 Token 数 |
+
+<code>baseURL</code> 中不能嵌入用户名、密码或 API Key。远程服务必须兼容 OpenAI <code>/chat/completions</code> 的 <code>image_url</code> 内容格式。
+
+### Provider 回退
+
+最多可以配置三个后备 Provider，插件会按照列表顺序逐个尝试，不会并发把图片发送给多个端点。
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>providerRouting.attemptTimeoutMs</code> | <code>45000</code> | 单个 Provider 的尝试超时 |
+| <code>providerRouting.failureThreshold</code> | <code>2</code> | 连续失败多少次后进入冷却 |
+| <code>providerRouting.cooldownSeconds</code> | <code>60</code> | 故障 Provider 的冷却时间 |
+
+总超时 <code>timeoutMs</code> 应大于单次超时 <code>attemptTimeoutMs</code>，否则可能没有足够时间尝试后备 Provider。
+
+## 图片限制与缓存
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>limits.maxImagesPerCall</code> | <code>4</code> | 单次视觉调用最多处理的图片数 |
+| <code>limits.maxImageBytes</code> | <code>10485760</code> | 单张图片最大字节数，默认 10 MiB |
+| <code>limits.maxImagePixels</code> | <code>40000000</code> | 单张图片最大像素数 |
+| <code>cache.enabled</code> | <code>true</code> | 是否缓存视觉结果 |
+| <code>cache.maxEntries</code> | <code>200</code> | 最大缓存条目数 |
+| <code>cache.ttlSeconds</code> | <code>3600</code> | 缓存有效时间；设为 0 表示不按时间过期 |
+
+## 本地图片处理
+
+本地裁剪、截图比较和调色板提取依赖可选的 Sharp 后端。
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>localProcessing.enabled</code> | <code>true</code> | 是否启用本地像素工具 |
+| <code>localProcessing.maxWorkingPixels</code> | <code>16000000</code> | 本地处理过程允许的最大工作像素数 |
+
+<code>vision_compare</code> 要求两张截图尺寸完全相同。插件不会自动缩放或对齐图片，以免掩盖真实布局变化。
+
+## 本地 OCR
+
+<code>vision_ocr</code> 默认使用远程视觉 Provider。只有明确选择 <code>backend="local"</code> 时，才会进入本地 Tesseract OCR。
+
+开启本地 OCR 前，需要自行准备可信来源的 Tesseract 语言数据文件：
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>localOcr.enabled</code> | <code>false</code> | 是否允许本地 OCR |
+| <code>localOcr.languagePath</code> | 空 | 语言文件所在的绝对本地目录 |
+| <code>localOcr.languages</code> | <code>eng</code> | 1～4 个语言代码，例如 <code>eng</code>、<code>chi_sim</code> |
+| <code>localOcr.gzip</code> | <code>true</code> | 是否使用 <code>.traineddata.gz</code> 文件 |
+| <code>localOcr.timeoutMs</code> | <code>60000</code> | 单次本地识别超时 |
+| <code>localOcr.maxLanguageBytes</code> | <code>52428800</code> | 单个语言文件最大字节数 |
+| <code>localOcr.maxRegions</code> | <code>50</code> | 最多返回的文字区域数 |
+| <code>localOcr.pageSegMode</code> | <code>auto</code> | 页面分割模式：<code>auto</code>、<code>single-block</code> 或 <code>sparse-text</code> |
+| <code>localOcr.autoRotate</code> | <code>true</code> | 是否自动处理方向 |
+| <code>localOcr.lowConfidenceThreshold</code> | <code>40</code> | 低置信度提示阈值 |
+
+Windows 配置示例：
+
+~~~yaml
+localOcr:
+  enabled: true
+  languagePath: 'D:\vision-data\tesseract'
+  languages: [eng, chi_sim]
+  gzip: true
+  timeoutMs: 60000
+  maxLanguageBytes: 52428800
+  maxRegions: 50
+  pageSegMode: auto
+  autoRotate: true
+  lowConfidenceThreshold: 40
+~~~
+
+目录中应存在 <code>eng.traineddata.gz</code>、<code>chi_sim.traineddata.gz</code> 等与配置一致的文件。本地 OCR 不会自动下载语言包、访问 CDN、写入 Tesseract 缓存，也不会在失败后自动切换到远程 Provider。
+
+## 网页截图
+
+网页截图默认关闭。开启后必须填写精确的主机白名单：
+
+| 字段 | 默认值 | 说明 |
+| --- | ---: | --- |
+| <code>browserCapture.enabled</code> | <code>false</code> | 是否注册网页截图工具 |
+| <code>browserCapture.browserChannel</code> | <code>msedge</code> | 使用 <code>msedge</code> 或 <code>chrome</code> |
+| <code>browserCapture.allowedHosts</code> | 空 | 允许访问的精确主机名列表 |
+| <code>browserCapture.allowPrivateHosts</code> | <code>false</code> | 是否允许访问本机或私有网络地址 |
+| <code>browserCapture.viewportWidth</code> | <code>1440</code> | 浏览器视口宽度 |
+| <code>browserCapture.viewportHeight</code> | <code>900</code> | 浏览器视口高度 |
+| <code>browserCapture.maxPageHeight</code> | <code>12000</code> | 全页截图的最大页面高度 |
+| <code>browserCapture.navigationTimeoutMs</code> | <code>30000</code> | 页面导航超时 |
+
+白名单只填写主机名，不要包含协议、端口、路径或通配符：
+
+~~~yaml
+browserCapture:
+  enabled: true
+  browserChannel: msedge
+  allowedHosts:
+    - example.com
+    - cdn.example.com
+  allowPrivateHosts: false
+  viewportWidth: 1440
+  viewportHeight: 900
+  maxPageHeight: 12000
+  navigationTimeoutMs: 30000
+~~~
+
+插件每次都会创建新的非持久浏览器上下文，不复用用户登录态。下载、弹窗和 Service Worker 会被禁用；导航、重定向、子资源及 WebSocket 都受同一白名单约束。
+
+如需截图本机开发服务，必须把 <code>127.0.0.1</code> 加入 <code>allowedHosts</code>，并开启 <code>allowPrivateHosts</code>。这会扩大本机网络访问范围，只建议在可信的隔离 Profile 中使用。
+
+## YAML 配置示例
+
+没有 Web 配置界面时，可以在 Profile 的后置 Patch 中使用：
+
+~~~yaml
 - id: vision-workbench
   name: dsh-vision-workbench
   config:
@@ -119,163 +257,33 @@ Bundle 安装后默认保持 `enabled: false`，不会注册远程视觉能力�
       navigationTimeoutMs: 30000
     timeoutMs: 120000
     proxyUrl: ""
-```
+~~~
 
-使用 YAML 时，仍需在 Harness Credentials 中保存 `VISION_API_KEY`，不要把真实值写进 YAML。
+API Key 不应直接写入 YAML。请在 Harness Credentials 或插件可视化配置卡片中，把真实密钥保存到 <code>credentialRef</code> 指定的名称。
 
-启用后，在模型选择器里选择：
+## 使用示例
 
-```text
-DeepSeek + Vision Workbench / <配置的 DeepSeek 模型>
-```
+上传图片后可以直接向所选的包装模型提问。模型可根据任务调用：
 
-然后上传图片并正常提问。包装路由会让 DeepSeek 看到确定性的附件标记，模型可以调用：
-
-```text
+~~~text
 vision_describe attachment_ids=["sha256:..."] question="这张截图显示了什么？" structured=true
-```
-
-阶段 2 工具示例：
-
-```text
 vision_ocr attachment_id="sha256:..." language_hint="中文和英文"
 vision_ocr attachment_id="sha256:..." backend="local"
 vision_crop attachment_id="sha256:..." region={"x":100,"y":80,"width":600,"height":300}
 vision_compare before={"attachment_id":"sha256:before"} after={"attachment_id":"sha256:after"} tolerance=0.02
 vision_palette path="screenshots/home.png" count=6
-```
-
-`vision_crop` 和 `vision_compare` 返回的图片会先通过 `ctx.attachments.saveImage()` 保存，再作为工具结果中的图片块进入会话。后续可以直接把新附件 ID 交给 `vision_describe` 或 `vision_ocr`。
-
-## 阶段 3 网页截图闭环
-
-网页截图是第二层显式开关。先只加入确实需要访问的精确主机名，不要写协议、端口、路径或通配符：
-
-```yaml
-browserCapture:
-  enabled: true
-  browserChannel: msedge
-  allowedHosts:
-    - example.com
-    - cdn.example.com
-  allowPrivateHosts: false
-  viewportWidth: 1440
-  viewportHeight: 900
-  maxPageHeight: 12000
-  navigationTimeoutMs: 30000
-```
-
-随后可以组成有界开发闭环：
-
-```text
 vision_browser_capture url="https://example.com" full_page=true wait_after_load_ms=500
-vision_describe attachment_ids=["sha256:..."] question="检查页面布局和可见错误" structured=true
-vision_compare before={"attachment_id":"sha256:before"} after={"attachment_id":"sha256:after"}
-```
+~~~
 
-每次调用只启动本机已安装的 Edge（默认）或 Chrome，无需执行 `playwright install`，也不会下载 Chromium。浏览器使用非持久临时上下文，Service Worker 被关闭，下载被禁止，弹窗被自动取消；浏览器及其上下文会在成功、失败、中止或插件卸载时关闭。页面引用的外部 CDN 若未列入白名单会被阻断并计入 `blockedRequests`。
+裁剪图、差异图和网页截图都会保存为持久附件，可继续交给 <code>vision_describe</code>、<code>vision_ocr</code> 或后续会话步骤使用。
 
-若确实要截图本机开发服务器，必须同时将 `127.0.0.1` 加入 `allowedHosts` 并把 `allowPrivateHosts` 改为 `true`。这会扩大 SSRF/本机服务访问面，只建议用于可信项目的隔离 Profile。
+## 能力边界
 
-## 阶段 4 多 Provider 回退
-
-主 Provider 保持在 `visionProvider`，后备 Provider 按 `fallbackProviders` 数组顺序尝试，最多三个。每个 `name` 必须唯一，因为该名称会进入持久工具结果和安全错误摘要：
-
-```yaml
-visionProvider:
-  name: primary
-  baseURL: https://vision-a.example/v1
-  model: vision-a
-  credentialRef: VISION_A_KEY
-  allowKeyless: false
-  allowInsecureLocalhost: false
-  maxTokens: 4096
-fallbackProviders:
-  - name: backup
-    baseURL: https://vision-b.example/v1
-    model: vision-b
-    credentialRef: VISION_B_KEY
-    allowKeyless: false
-    allowInsecureLocalhost: false
-    maxTokens: 4096
-providerRouting:
-  attemptTimeoutMs: 45000
-  failureThreshold: 2
-  cooldownSeconds: 60
-```
-
-路由只执行顺序、有限回退，不并发发送图片。某 Provider 连续失败达到 `failureThreshold` 后会在进程内短路 `cooldownSeconds`；冷却结束后自动探测恢复。用户取消会立即停止，不会继续向后备端点发送图片。所有 Provider 共用整次工具调用的 `timeoutMs`，所以总超时应大于单次 `attemptTimeoutMs`，才能为后备调用留下时间。
-
-成功结果会记录 `provider`、`model`、`providerAttempts` 和 `fallbackUsed`，分别表示实际成功端点、实际模型、本次尝试过的 Provider 数量，以及是否由非主 Provider 完成。单个 Provider 内部的一次 429 重试仍算一个 Provider 尝试。
-
-## 阶段 5 离线 OCR
-
-本地 OCR 是独立、显式的隐私边界。将可信来源的 Tesseract `.traineddata.gz` 文件放进一个本地目录，并在隔离 Profile 中启用：
-
-```yaml
-localOcr:
-  enabled: true
-  languagePath: 'D:\vision-data\tesseract'
-  languages: [eng, chi_sim]
-  gzip: true
-  timeoutMs: 60000
-  maxLanguageBytes: 52428800
-  maxRegions: 50
-  pageSegMode: auto
-  autoRotate: true
-  lowConfidenceThreshold: 40
-```
-
-目录中必须存在与配置完全对应的文件，例如 `eng.traineddata.gz` 和 `chi_sim.traineddata.gz`。建议先核对发布方与 SHA-256，再复制到固定只读目录。若使用未压缩文件，将 `gzip` 设为 `false`，文件名改为 `.traineddata`。
-
-```text
-vision_ocr path="screenshots/settings.png" backend="local"
-```
-
-本地模式不使用 `visionProvider`、不会访问 CDN、不会写 Tesseract 缓存，也不会在失败后静默切换远程 Provider。结果中的 `backend` 为 `local`，`provider` 为 `local-tesseract`，并附带页级 `confidence`。`languages` 决定实际识别数据；`language_hint` 只用于远程 Provider。
-
-一个插件实例只创建一个惰性 Worker，多次识别按顺序复用，以限制 Windows 上的内存峰值。超时、取消和插件卸载都会终止 Worker；下一次调用才会重新创建。
-
-## 阶段 2 本地后端
-
-Sharp 0.35.3 是可选生产依赖，官方提供 Windows x64 和 ARM64 预编译包。插件只在调用本地工具时动态加载它，不修改全局 Sharp 缓存、并发度或 libvips 设置。
-
-- 安装器必须允许 optional dependencies；否则三个本地工具会给出明确的后端不可用错误。
-- 本地操作同时受输入字节、输入像素和 `localProcessing.maxWorkingPixels` 限制。
-- 当前像素比较要求两张图片尺寸完全相同，避免自动缩放掩盖真实布局差异。
-- OCR 默认使用远程视觉 Provider；只有显式 `backend="local"` 才进入离线路径。本地路径从不隐式下载语言包，远程路径只有在工具真正执行时才发送所选图片。
-- Tesseract.js 7.0.0 是惰性加载的可选生产依赖；本地 OCR 语言数据由用户独立管理，不进入插件 tarball。
-
-## 本地开发
-
-安装依赖前应先审查锁文件。阶段 2 的 Sharp 使用平台预编译可选包；不需要本机 Visual Studio/C++ 编译器时，不应允许退回源码构建。阶段 3 的 `playwright-core` 不携带或下载浏览器，直接控制本机已有的稳定版 Edge/Chrome。
-
-```powershell
-pnpm install --frozen-lockfile
-pnpm run check
-pnpm run smoke:local-ocr
-```
-
-首次生成锁文件时使用 `pnpm install`，提交并审查锁文件后再使用 `--frozen-lockfile`。
-
-### Windows 路径注意事项
-
-当前 rc.5 的 `dsh plugin` 在 Windows 上会通过 shell 转发 pnpm 参数；本地插件或 tarball 路径含空格时，路径可能被错误拆分。
-本项目目录本身含空格，因此验证时先把 tarball 复制到无空格的临时路径，再执行 `dsh plugin --profile <name> add <tarball>`。
-这是 Harness CLI 的上游限制，不是本插件对图片路径的限制；安装完成后，工作区图片路径仍通过 `ctx.fs` 正常处理。
-
-## 已知限制
-
-- 工作区文件只做有界格式和尺寸头检查；上传附件的完整解码验证由 Harness `ctx.attachments` 保证。
-- 视觉 Provider 必须兼容 OpenAI `/chat/completions` 的 `image_url` 内容格式。
-- 最多配置三个后备 Provider；当前只做固定顺序回退，不做成本、延迟或质量评分路由。
-- 熔断状态是进程内临时状态，插件重载或进程重启后会清零；它不是跨节点健康检查系统。
-- 包装路由只公布配置中的一个文本模型；修改模型或路由需要重载插件。
-- 可视化配置保存后需要重启当前 Profile；这是明确的资源生命周期边界，不是保存失败。
-- 图片标记是持久附件引用的确定性投影，不包含未记录的视觉结论；真正视觉结论只通过持久工具结果进入会话。
-- Provider OCR 区域框来自视觉模型，本地 OCR 区域框来自 Tesseract 文本块；两者都属于近似证据，需要像素级操作前应先核对或显式指定裁剪坐标。
-- 本地 OCR 不理解界面语义，复杂表格、手写字、低对比度或旋转截图的质量可能明显低于多模态视觉模型；`confidence` 只能用于提示复核，不能当作正确性保证。
-- 调色板使用缩小采样与 5-bit RGB 量化，适合界面主色判断，不是色彩管理或印刷取色工具。
-- 网页截图是视觉证据而不是 DOM 自动化；当前没有元素选择器、点击、键盘、登录、可访问性树或 PDF 导出。
-- 精确白名单可能阻断第三方字体、图片或脚本；根据 `blockedRequests` 审查后逐个加入所需主机。
-- 公司 Edge/Chrome 策略可能阻止 Playwright 启动；此时应切换已安装的另一浏览器通道或由管理员调整策略，而不是关闭网络边界。
+- 不禁用或替换 <code>deepseek-official</code>。
+- 不内置匿名视觉服务，不会在没有配置 Provider 时发送图片。
+- 不支持 GIF；请先转换为 PNG、JPEG 或 WebP。
+- 不捆绑或自动下载 Tesseract 语言数据。
+- 不接管用户已经打开的浏览器，不复用登录态，也不执行网页点击、输入或表单提交。
+- 网页截图提供视觉证据，不提供 DOM 自动化、登录或 PDF 导出。
+- 本地 OCR 对复杂表格、手写字、低对比度或旋转截图的效果可能低于多模态视觉模型。
+- 调色板适合界面主色判断，不适合作为色彩管理或印刷取色工具。
