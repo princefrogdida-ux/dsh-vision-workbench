@@ -1,0 +1,23 @@
+# Security model
+
+- The plugin never takes over `deepseek-official` and is disabled after installation until explicitly configured.
+- Remote image transmission occurs only when `vision_describe` runs. The selected image bytes and the question are sent to the configured provider.
+- Credential values are resolved through `ctx.credentials`, used only in an Authorization header, and never logged.
+- Remote endpoints must use HTTPS. Plain HTTP is accepted only for an explicitly enabled loopback test server.
+- PNG, JPEG, and WebP inputs are bounded by encoded bytes and declared pixel count. Uploaded attachments receive the Harness store's full validation; workspace paths receive bounded header inspection in phase 1.
+- Sharp is an optional native decoder loaded only for local stage 2 operations. Every decode uses a working-pixel limit; derived PNGs are revalidated by `ctx.attachments.saveImage()` before publication.
+- Pixel comparison refuses dimension mismatch instead of allocating an implicit resized canvas. Its default 16-million-pixel working cap bounds raw RGBA and diff buffers.
+- Provider OCR shares the explicit remote-transmission boundary of `vision_describe`. Region OCR transmits only the locally cropped pixels; full-image OCR transmits the selected full image.
+- Local OCR is a separate opt-in backend. It reads only explicitly configured absolute-path language files, disables Tesseract cache writes, performs recognition in memory, and never silently falls back to a provider.
+- Fallback providers are explicit, ordered, and individually validated. A selected image may be sent sequentially to more than one configured endpoint only after an earlier attempt fails; no provider receives it concurrently.
+- User cancellation stops fallback immediately. Per-provider timeouts, total operation timeout, failure thresholds, and cooldowns bound retries and prevent persistent traffic to an unhealthy endpoint.
+- Successful tool results record only configured provider identifiers, models, attempt count, and fallback use. Aggregate failures expose provider identifiers and coarse categories, not raw upstream response bodies, URLs, credential references, or tokens.
+- The plugin never downloads Tesseract language data. One local OCR worker is started lazily only after a local request passes language-file preflight; calls are serialized and the worker is terminated on timeout, cancellation, or plugin disposal.
+- Tesseract language files are untrusted native-model inputs. Obtain them from a trusted source, verify their digest, keep the directory read-only, and constrain each file with `maxLanguageBytes`.
+- Session attachment state is process-local, LRU-bounded, and cleared on plugin disposal. The durable session log remains authoritative.
+- Proxying is request-local through an owned Undici dispatcher. The plugin never patches global fetch.
+- Browser capture is separately disabled by default and requires a non-empty exact-host allowlist. Top-level navigation, redirects, subresources, and WebSockets pass through the same policy.
+- Browser capture accepts only HTTP(S), rejects URL-embedded credentials, blocks private/loopback/link-local destinations and private DNS answers unless `allowPrivateHosts` is explicitly enabled, disables service workers and downloads, and bounds page height, pixels, encoded bytes, and time.
+- Each capture launches an installed Edge/Chrome channel in a fresh non-persistent context. It never attaches to an existing profile or inherits user cookies, and the owned browser is closed on completion, cancellation, or plugin disposal.
+- `allowPrivateHosts: true` deliberately permits allowlisted local or LAN services and materially expands SSRF scope. Use it only in a dedicated trusted-development Profile.
+- Report vulnerabilities privately before sharing proof-of-concept inputs that could affect image parsers or provider credentials.

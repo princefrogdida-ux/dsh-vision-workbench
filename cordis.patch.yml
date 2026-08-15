@@ -1,0 +1,10 @@
+# Safe-by-default bundle row. Installation does not replace deepseek-official
+# and does not activate a remote image provider without explicit configuration.
+- insert:
+    - id: vision-workbench
+      name: dsh-vision-workbench
+      # Loader-level injection is explicit for tree-out bundles. This ensures
+      # the host entry receives the scoped Settings proxy used by register().
+      inject: [tools, llm, attachments, settings]
+      config:
+        enabled: false

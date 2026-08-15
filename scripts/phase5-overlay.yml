@@ -1,0 +1,61 @@
+- id: vision-workbench
+  name: dsh-vision-workbench
+  config:
+    enabled: true
+    wrapperRoute: deepseek-vision-workbench
+    textProvider:
+      provider: deepseek-official
+      model: deepseek-v4-pro
+    visionProvider:
+      name: primary
+      baseURL: http://127.0.0.1:9/v1
+      model: mock-vision
+      credentialRef: ""
+      allowKeyless: true
+      allowInsecureLocalhost: true
+      maxTokens: 256
+    fallbackProviders:
+      - name: backup
+        baseURL: http://127.0.0.1:10/v1
+        model: mock-vision-backup
+        credentialRef: ""
+        allowKeyless: true
+        allowInsecureLocalhost: true
+        maxTokens: 256
+    providerRouting:
+      attemptTimeoutMs: 1000
+      failureThreshold: 1
+      cooldownSeconds: 5
+    limits:
+      maxImagesPerCall: 2
+      maxImageBytes: 1048576
+      maxImagePixels: 2000000
+    cache:
+      enabled: true
+      maxEntries: 10
+      ttlSeconds: 60
+    localProcessing:
+      enabled: true
+      maxWorkingPixels: 2000000
+    localOcr:
+      enabled: true
+      languagePath: "__LOCAL_OCR_LANGUAGE_PATH__"
+      languages: [eng]
+      gzip: true
+      timeoutMs: 60000
+      maxLanguageBytes: 52428800
+      maxRegions: 50
+      pageSegMode: single-block
+      autoRotate: false
+      lowConfidenceThreshold: 40
+    browserCapture:
+      enabled: false
+      browserChannel: msedge
+      allowedHosts: []
+      allowPrivateHosts: false
+      viewportWidth: 800
+      viewportHeight: 600
+      maxPageHeight: 1200
+      navigationTimeoutMs: 15000
+    timeoutMs: 65000
+    proxyUrl: ""

@@ -1,0 +1,117 @@
+{
+  "name": "dsh-vision-workbench",
+  "version": "0.7.1",
+  "description": "Windows-first, non-invasive vision tools for DeepSeek Harness.",
+  "license": "MIT",
+  "homepage": "https://github.com/princefrogdida-ux/dsh-vision-workbench#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/princefrogdida-ux/dsh-vision-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/princefrogdida-ux/dsh-vision-workbench/issues"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/client-types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "SECURITY.md",
+    "THIRD_PARTY_NOTICES.md",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "pnpm run build:host && pnpm run build:client-types && pnpm run build:client",
+    "build:host": "tsc -p tsconfig.json",
+    "build:client-types": "tsc -p tsconfig.client.json",
+    "build:client": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit --emitDeclarationOnly false",
+    "test": "tsx --test tests/*.test.ts",
+    "smoke:local-ocr": "tsx scripts/smoke-local-ocr.mts",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "dependencies": {
+    "undici": "7.29.0"
+  },
+  "optionalDependencies": {
+    "playwright-core": "1.61.1",
+    "sharp": "0.35.3",
+    "tesseract.js": "7.0.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-attachment": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-settings-plugins": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-credentials": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-fs": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.5 || 0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "3.18.1",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-attachment": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-credentials": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-fs": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "3.18.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-settings-plugins": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@types/node": "^24.10.0",
+    "@types/react": "~18.3.1",
+    "lightningcss": "1.32.0",
+    "react": "18.3.1",
+    "tsdown": "0.22.2",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    }
+  }
+}
